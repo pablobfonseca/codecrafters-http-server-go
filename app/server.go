@@ -22,11 +22,20 @@ func main() {
 
 	defer listener.Close()
 
-	conn, err := listener.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+
+		go handleConnection(conn)
 	}
+
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
 
 	buf := make([]byte, 1024)
 	requestTimeout, err := conn.Read(buf)
