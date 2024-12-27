@@ -36,34 +36,12 @@ func main() {
 	url := strings.Split(requestLine, " ")[1]
 
 	if url == "/index.html" || url == "/" {
-		success(conn)
+		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	} else if strings.HasPrefix(url, "/echo/") {
 		resp, _ := strings.CutPrefix(url, "/echo/")
 
-		successWithResponse(conn, []byte(resp))
+		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(resp), string(resp))))
 	} else {
-		notFound(conn)
-	}
-}
-
-func success(conn net.Conn) {
-	_, err := conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	if err != nil {
-		fmt.Println("Error sending data: ", err.Error())
-	}
-}
-
-func successWithResponse(conn net.Conn, responseBody []byte) {
-	_, err := conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(responseBody), string(responseBody))))
-
-	if err != nil {
-		fmt.Println("Error sending data: ", err.Error())
-	}
-}
-
-func notFound(conn net.Conn) {
-	_, err := conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-	if err != nil {
-		fmt.Println("Error sending data: ", err.Error())
+		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
 }
