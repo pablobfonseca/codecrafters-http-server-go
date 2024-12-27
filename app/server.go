@@ -36,15 +36,22 @@ func main() {
 	url := strings.Split(requestLine, " ")[1]
 
 	if url == "/index.html" || url == "/" {
-		_, err = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-		if err != nil {
-			fmt.Println("Error sending data: ", err.Error())
-		}
+		success(conn)
 	} else {
-		_, err = conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-		if err != nil {
-			fmt.Println("Error sending data: ", err.Error())
-		}
+		notFound(conn)
+	}
+}
 
+func success(conn net.Conn) {
+	_, err := conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	if err != nil {
+		fmt.Println("Error sending data: ", err.Error())
+	}
+}
+
+func notFound(conn net.Conn) {
+	_, err := conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+	if err != nil {
+		fmt.Println("Error sending data: ", err.Error())
 	}
 }
