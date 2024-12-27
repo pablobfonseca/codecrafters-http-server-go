@@ -37,6 +37,10 @@ func main() {
 
 	if url == "/index.html" || url == "/" {
 		success(conn)
+	} else if strings.HasPrefix(url, "/echo/") {
+		resp, _ := strings.CutPrefix(url, "/echo/")
+
+		successWithResponse(conn, []byte(resp))
 	} else {
 		notFound(conn)
 	}
@@ -44,6 +48,14 @@ func main() {
 
 func success(conn net.Conn) {
 	_, err := conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	if err != nil {
+		fmt.Println("Error sending data: ", err.Error())
+	}
+}
+
+func successWithResponse(conn net.Conn, responseBody []byte) {
+	_, err := conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(responseBody), string(responseBody))))
+
 	if err != nil {
 		fmt.Println("Error sending data: ", err.Error())
 	}
