@@ -16,7 +16,7 @@ const (
 )
 
 type HTTPRequest struct {
-	Method   string
+	Method   Methods
 	Protocol string
 	URI      string
 	Headers  map[string]string
@@ -41,7 +41,7 @@ func ParseRequest(requestBuffer []byte, requestTimeout int) (*HTTPRequest, error
 	}
 
 	r := &HTTPRequest{
-		Method:   parts[0],
+		Method:   Methods(parts[0]),
 		URI:      parts[1],
 		Protocol: parts[2],
 		Headers:  parseHeaders(headersLines),
