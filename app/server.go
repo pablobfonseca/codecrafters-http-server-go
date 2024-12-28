@@ -53,6 +53,17 @@ func handleConnection(conn net.Conn) {
 	} else if request.URI == "/user-agent" {
 		userAgent := request.Headers["user-agent"]
 		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(userAgent), userAgent)))
+	} else if strings.HasPrefix(request.URI, "/files/") {
+		dir := os.Args[2]
+		filename, _ := strings.CutPrefix(request.URI, "/files/")
+
+		content, err := os.ReadFile(fmt.Sprintf("%s%s", dir, filename))
+		if err == nil {
+			conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(content), content)))
+		} else {
+			conn.Write([]byte(NotFound))
+		}
+
 	} else {
 		conn.Write([]byte(NotFound))
 	}
