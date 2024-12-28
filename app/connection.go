@@ -11,7 +11,7 @@ import (
 type Route struct {
 	Method  Methods
 	URI     string
-	Handler func(request *HTTPRequest) HTTPResponse
+	Handler func(request *HTTPRequest)
 }
 
 func (r *Route) match(request *HTTPRequest) bool {
@@ -54,7 +54,7 @@ func (c *Connection) connect() (net.Listener, error) {
 	return c.Listener, nil
 }
 
-func (c *Connection) Use(method Methods, uri string, handler func(request *HTTPRequest) HTTPResponse) {
+func (c *Connection) Use(method Methods, uri string, handler func(request *HTTPRequest)) {
 	c.Routes = append(c.Routes, &Route{
 		Method:  method,
 		URI:     uri,
@@ -68,16 +68,15 @@ func (c *Connection) ProcessRoutes(request *HTTPRequest, conn net.Conn) {
 		match := route.match(request)
 		if match {
 			foundRoute = true
-			resp := route.Handler(request)
-
-			conn.Write([]byte(resp))
+			route.Handler(request)
 			return
 		}
 
 	}
 
 	if !foundRoute {
-		conn.Write([]byte(NotFound))
+		response := NewResponse(404, nil, nil)
+		response.send(conn)
 	}
 }
 
@@ -90,10 +89,13 @@ func (c *Connection) handle(conn net.Conn) {
 		fmt.Println("Error reading data: ", err.Error())
 	}
 
-	request, err := ParseRequest(buf, requestTimeout)
+	request, err := ParseRequest(buf, requestTimeout, conn)
 
 	if err != nil {
 		fmt.Printf("Error with request: %s\n", err.Error())
+		response := NewResponse(400, nil, nil)
+		response.send(conn)
+		return
 	}
 
 	c.ProcessRoutes(request, conn)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"net"
 	"strings"
 )
 
@@ -21,9 +22,10 @@ type HTTPRequest struct {
 	URI      string
 	Headers  map[string]string
 	Body     string
+	Conn     net.Conn
 }
 
-func ParseRequest(requestBuffer []byte, requestTimeout int) (*HTTPRequest, error) {
+func ParseRequest(requestBuffer []byte, requestTimeout int, conn net.Conn) (*HTTPRequest, error) {
 	if requestTimeout == 0 || len(requestBuffer) == 0 {
 		return nil, errors.New("Invalid request")
 	}
@@ -41,11 +43,12 @@ func ParseRequest(requestBuffer []byte, requestTimeout int) (*HTTPRequest, error
 	}
 
 	r := &HTTPRequest{
-		Method:   Methods(parts[0]),
+		Method:   Methods(strings.ToUpper(parts[0])),
 		URI:      parts[1],
 		Protocol: parts[2],
 		Headers:  parseHeaders(headersLines),
 		Body:     bodyLine,
+		Conn:     conn,
 	}
 
 	return r, nil
