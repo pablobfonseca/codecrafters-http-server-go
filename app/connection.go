@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"slices"
 	"strings"
 )
 
@@ -106,9 +107,9 @@ func (c *Connection) handle(conn net.Conn) {
 	})
 	c.Use("GET", "/echo", func(request *HTTPRequest) HTTPResponse {
 		resp := strings.TrimPrefix(request.URI, "/echo/")
-		encoding := request.Headers["accept-encoding"]
+		encodings := strings.Split(request.Headers["accept-encoding"], ", ")
 
-		if encoding == "gzip" {
+		if slices.Contains(encodings, "gzip") {
 			compressed, err := compressString(resp)
 			if err != nil {
 				fmt.Printf("Error with compression: %s\n", err.Error())
