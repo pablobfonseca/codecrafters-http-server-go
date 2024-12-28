@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 
@@ -94,6 +95,18 @@ func (r *Response) Send() {
 	}
 	r.conn.Write([]byte("\r\n"))
 	r.conn.Write(r.body)
+}
+
+func (r *Response) Json(data interface{}) {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		r.Status(500).Body([]byte("Internal Server Error")).Send()
+		return
+	}
+
+	r.AddContentTypeHeader("application/json")
+	r.AddContentLengthHeader(len(jsonData))
+	r.Body(jsonData).Send()
 }
 
 func (r *Response) AddContentTypeHeader(value string) {

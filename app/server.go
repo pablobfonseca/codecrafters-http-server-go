@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path"
@@ -89,13 +88,28 @@ func setupRoutes(c *Connection) {
 			response.Status(400).Send()
 		}
 
-		data := []byte(bytes.Trim([]byte(request.Body), "\x00"))
-		_, err = file.Write(data)
+		_, err = file.Write(request.Body)
 		if err != nil {
 			fmt.Printf("Error creating the file: %s\n", err.Error())
 			response.Status(404).Send()
 		} else {
 			response.Status(201).Send()
 		}
+	})
+	c.Use("POST", "/user", func(request *HTTPRequest, response *Response) {
+		var data map[string]interface{}
+		if err := request.ParseJSON(&data); err != nil {
+			response.Status(400).Body([]byte("Invalid JSON")).Send()
+			return
+		}
+
+		response.Status(200).Json(data)
+	})
+	c.Use("GET", "/status", func(request *HTTPRequest, response *Response) {
+		data := map[string]string{
+			"message": "ok",
+		}
+
+		response.Status(200).Json(data)
 	})
 }
