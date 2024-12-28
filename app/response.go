@@ -40,31 +40,41 @@ type Header struct {
 }
 
 type Response struct {
-	Status
+	status  Status
+	body    []byte
+	conn    net.Conn
 	Headers map[Headers]string
-	Body    []byte
 }
 
-func NewResponse(statusCode int, headers []Header, body []byte) Response {
+func (r *Response) Status(statusCode int) *Response {
 	status, valid := STATUS_CODES[statusCode]
 
 	if !valid {
 		status = "Unknown Status"
 	}
 
-	headersMap := make(map[Headers]string)
-	for _, header := range headers {
-		headersMap[header.Name] = header.Value
+	r.status = Status{
+		Code:   statusCode,
+		Status: status,
 	}
 
-	return Response{
-		Status: Status{
-			Code:   statusCode,
-			Status: status,
-		},
-		Headers: headersMap,
-		Body:    body,
+	return r
+}
+
+func NewResponse(conn net.Conn) *Response {
+	return &Response{
+		Headers: make(map[Headers]string),
+		conn:    conn,
 	}
+}
+
+func (r *Response) Body(data []byte) *Response {
+	r.body = data
+	return r
+}
+
+func (r *Response) AddHeader(name Headers, value string) {
+	r.Headers[name] = value
 }
 
 func (r *Response) GetHeader(name Headers) (string, bool) {
@@ -72,20 +82,20 @@ func (r *Response) GetHeader(name Headers) (string, bool) {
 	return value, exists
 }
 
-func (r *Response) send(conn net.Conn) {
-	conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n", r.Status.Code, r.Status.Status)))
+func (r *Response) Send() {
+	r.conn.Write([]byte(fmt.Sprintf("HTTP/1.1 %d %s\r\n", r.status.Code, r.status.Status)))
 
 	for name, value := range r.Headers {
-		conn.Write([]byte(fmt.Sprintf("%s: %s\r\n", name, value)))
+		r.conn.Write([]byte(fmt.Sprintf("%s: %s\r\n", name, value)))
 	}
-	conn.Write([]byte("\r\n"))
-	conn.Write(r.Body)
+	r.conn.Write([]byte("\r\n"))
+	r.conn.Write(r.body)
 }
 
-func ContentTypeHeader(value string) Header {
-	return Header{"Content-Type", value}
+func (r *Response) AddContentTypeHeader(value string) {
+	r.Headers["Content-Type"] = value
 }
 
-func ContentLengthHeader(length int) Header {
-	return Header{"Content-Length", fmt.Sprintf("%d", length)}
+func (r *Response) AddContentLengthHeader(length int) {
+	r.Headers["Content-Length"] = fmt.Sprintf("%d", length)
 }

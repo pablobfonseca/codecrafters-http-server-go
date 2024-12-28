@@ -11,7 +11,7 @@ import (
 type Route struct {
 	Method  Methods
 	URI     string
-	Handler func(request *HTTPRequest)
+	Handler func(request *HTTPRequest, response *Response)
 }
 
 func (r *Route) match(request *HTTPRequest) bool {
@@ -54,7 +54,7 @@ func (c *Connection) connect() (net.Listener, error) {
 	return c.Listener, nil
 }
 
-func (c *Connection) Use(method Methods, uri string, handler func(request *HTTPRequest)) {
+func (c *Connection) Use(method Methods, uri string, handler func(request *HTTPRequest, response *Response)) {
 	c.Routes = append(c.Routes, &Route{
 		Method:  method,
 		URI:     uri,
@@ -65,18 +65,18 @@ func (c *Connection) Use(method Methods, uri string, handler func(request *HTTPR
 func (c *Connection) ProcessRoutes(request *HTTPRequest, conn net.Conn) {
 	foundRoute := false
 	for _, route := range c.Routes {
-		match := route.match(request)
-		if match {
+		if route.match(request) {
 			foundRoute = true
-			route.Handler(request)
+			response := NewResponse(conn)
+			route.Handler(request, response)
 			return
 		}
 
 	}
 
 	if !foundRoute {
-		response := NewResponse(404, nil, nil)
-		response.send(conn)
+		response := NewResponse(conn)
+		response.Status(404).Send()
 	}
 }
 
@@ -93,8 +93,8 @@ func (c *Connection) handle(conn net.Conn) {
 
 	if err != nil {
 		fmt.Printf("Error with request: %s\n", err.Error())
-		response := NewResponse(400, nil, nil)
-		response.send(conn)
+		response := NewResponse(conn)
+		response.Status(400).Send()
 		return
 	}
 

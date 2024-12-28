@@ -36,15 +36,13 @@ func main() {
 }
 
 func setupRoutes(c *Connection) {
-	c.Use("GET", "/", func(request *HTTPRequest) {
-		response := NewResponse(200, nil, nil)
-		response.send(request.Conn)
+	c.Use("GET", "/", func(request *HTTPRequest, response *Response) {
+		response.Status(200).Send()
 	})
-	c.Use("GET", "/index.html", func(request *HTTPRequest) {
-		response := NewResponse(200, nil, nil)
-		response.send(request.Conn)
+	c.Use("GET", "/index.html", func(request *HTTPRequest, response *Response) {
+		response.Status(200).Send()
 	})
-	c.Use("GET", "/echo", func(request *HTTPRequest) {
+	c.Use("GET", "/echo", func(request *HTTPRequest, response *Response) {
 		resp := strings.TrimPrefix(request.URI, "/echo/")
 		encodings := strings.Split(request.Headers["accept-encoding"], ", ")
 
@@ -52,52 +50,43 @@ func setupRoutes(c *Connection) {
 			compressed, err := compressString(resp)
 			if err != nil {
 				fmt.Printf("Error with compression: %s\n", err.Error())
-				response := NewResponse(400, nil, nil)
-				response.send(request.Conn)
+				response.Status(400).Send()
 				return
 			}
-			response := NewResponse(200, []Header{
-				{"Content-Encoding", "gzip"},
-				ContentTypeHeader("text/plain"),
-				ContentLengthHeader(len(compressed)),
-			}, compressed)
-			response.send(request.Conn)
+			response.AddHeader("Content-Encoding", "gzip")
+			response.AddContentTypeHeader("text/plain")
+			response.AddContentLengthHeader(len(compressed))
+			response.Status(200).Body(compressed).Send()
 			return
 		}
 
-		response := NewResponse(200, []Header{
-			ContentTypeHeader("text/plain"),
-			ContentLengthHeader(len(resp)),
-		}, []byte(resp))
-		response.send(request.Conn)
+		response.AddContentTypeHeader("text/plain")
+		response.AddContentLengthHeader(len(resp))
+		response.Status(200).Body([]byte(resp)).Send()
 	})
-	c.Use("GET", "/user-agent", func(request *HTTPRequest) {
+	c.Use("GET", "/user-agent", func(request *HTTPRequest, response *Response) {
 		userAgent := request.Headers["user-agent"]
-		response := NewResponse(200, []Header{
-			ContentTypeHeader("text/plain"),
-			ContentLengthHeader(len(userAgent)),
-		}, []byte(userAgent))
-		response.send(request.Conn)
+
+		response.AddContentTypeHeader("text/plain")
+		response.AddContentLengthHeader(len(userAgent))
+		response.Status(200).Body([]byte(userAgent)).Send()
 	})
-	c.Use("GET", "/files", func(request *HTTPRequest) {
+	c.Use("GET", "/files", func(request *HTTPRequest, response *Response) {
 		dir := os.Args[2]
 		filename := strings.TrimPrefix(request.URI, "/files/")
 		filepath := path.Join(dir, filename)
 
 		content, err := os.ReadFile(filepath)
 		if err == nil {
-			response := NewResponse(200, []Header{
-				ContentTypeHeader("application/octet-stream"),
-				ContentLengthHeader(len(content)),
-			}, content)
-			response.send(request.Conn)
+			response.AddContentTypeHeader("application/octet-stream")
+			response.AddContentLengthHeader(len(content))
+			response.Status(200).Body(content).Send()
 		} else {
-			response := NewResponse(404, nil, nil)
-			response.send(request.Conn)
+			response.Status(404).Send()
 		}
 
 	})
-	c.Use("POST", "/files", func(request *HTTPRequest) {
+	c.Use("POST", "/files", func(request *HTTPRequest, response *Response) {
 		dir := os.Args[2]
 		filename := strings.TrimPrefix(request.URI, "/files/")
 		filepath := path.Join(dir, filename)
@@ -106,19 +95,16 @@ func setupRoutes(c *Connection) {
 		defer file.Close()
 		if err != nil {
 			fmt.Printf("Error creating file: %s\n", err.Error())
-			response := NewResponse(400, nil, nil)
-			response.send(request.Conn)
+			response.Status(400).Send()
 		}
 
 		data := []byte(bytes.Trim([]byte(request.Body), "\x00"))
 		_, err = file.Write(data)
 		if err != nil {
 			fmt.Printf("Error creating the file: %s\n", err.Error())
-			response := NewResponse(404, nil, nil)
-			response.send(request.Conn)
+			response.Status(404).Send()
 		} else {
-			response := NewResponse(201, nil, nil)
-			response.send(request.Conn)
+			response.Status(201).Send()
 		}
 	})
 }
