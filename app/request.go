@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"strings"
 )
@@ -21,42 +20,49 @@ type HTTPRequest struct {
 	Protocol string
 	URI      string
 	Headers  map[string]string
+	Body     string
 }
 
 func ParseRequest(requestBuffer []byte, requestTimeout int) (*HTTPRequest, error) {
 	if requestTimeout == 0 || len(requestBuffer) == 0 {
 		return nil, errors.New("Invalid request")
 	}
-	scanner := bufio.NewScanner(strings.NewReader(string(requestBuffer[:])))
-	var requestLine string
-	if scanner.Scan() {
-		requestLine = scanner.Text()
+
+	lines := strings.Split(string(requestBuffer), "\r\n")
+
+	requestLine := lines[0]
+
+	headersLines := lines[1 : len(lines)-1]
+	bodyLine := lines[len(lines)-1]
+
+	parts := strings.SplitN(requestLine, " ", 3)
+	if len(parts) < 3 {
+		return nil, errors.New("Malformed request line")
 	}
 
-	r := &HTTPRequest{}
-	r.Method = strings.Split(requestLine, " ")[0]
-	r.URI = strings.Split(requestLine, " ")[1]
-	r.Protocol = strings.Split(requestLine, " ")[2]
-	r.Headers = parseHeaders(scanner)
+	r := &HTTPRequest{
+		Method:   parts[0],
+		URI:      parts[1],
+		Protocol: parts[2],
+		Headers:  parseHeaders(headersLines),
+		Body:     bodyLine,
+	}
 
 	return r, nil
 }
 
-func parseHeaders(scanner *bufio.Scanner) map[string]string {
+func parseHeaders(headerLine []string) map[string]string {
 	headers := make(map[string]string)
 
-	for scanner.Scan() {
-		line := scanner.Text()
-
+	for _, line := range headerLine {
 		if line == "" {
 			break
 		}
-
 		parts := strings.SplitN(line, ": ", 2)
 		if len(parts) == 2 {
-			key, value := parts[0], parts[1]
-			headers[strings.ToLower(key)] = value
+			headers[strings.ToLower(parts[0])] = parts[1]
 		}
+
 	}
 
 	return headers

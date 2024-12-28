@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -40,31 +42,56 @@ func handleConnection(conn net.Conn) {
 	}
 
 	request, err := ParseRequest(buf, requestTimeout)
+
 	if err != nil {
 		fmt.Printf("Error with request: %s\n", err.Error())
 	}
 
+	var response HTTPResponse
 	if request.URI == "/index.html" || request.URI == "/" {
-		conn.Write([]byte(OK))
+		response = OK
 	} else if strings.HasPrefix(request.URI, "/echo/") {
-		resp, _ := strings.CutPrefix(request.URI, "/echo/")
+		resp := strings.TrimPrefix(request.URI, "/echo/")
 
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(resp), string(resp))))
+		response = HTTPResponse(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(resp), string(resp)))
 	} else if request.URI == "/user-agent" {
 		userAgent := request.Headers["user-agent"]
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(userAgent), userAgent)))
+		response = HTTPResponse(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(userAgent), userAgent))
 	} else if strings.HasPrefix(request.URI, "/files/") {
 		dir := os.Args[2]
-		filename, _ := strings.CutPrefix(request.URI, "/files/")
+		filename := strings.TrimPrefix(request.URI, "/files/")
+		filepath := path.Join(dir, filename)
 
-		content, err := os.ReadFile(fmt.Sprintf("%s%s", dir, filename))
-		if err == nil {
-			conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(content), content)))
-		} else {
-			conn.Write([]byte(NotFound))
+		if request.Method == "GET" {
+			content, err := os.ReadFile(filepath)
+			if err == nil {
+				header := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n", len(content))
+				conn.Write([]byte(header))
+				conn.Write(content)
+				return
+			} else {
+				response = NotFound
+			}
+		} else if request.Method == "POST" {
+			file, err := os.Create(filepath)
+			defer file.Close()
+			if err != nil {
+				fmt.Printf("Error creating file: %s\n", err.Error())
+				return
+			}
+
+			data := []byte(bytes.Trim([]byte(request.Body), "\x00"))
+			_, err = file.Write(data)
+			if err != nil {
+				fmt.Printf("Error creating the file: %s\n", err.Error())
+				response = NotFound
+			} else {
+				response = Created
+			}
 		}
-
 	} else {
-		conn.Write([]byte(NotFound))
+		response = NotFound
 	}
+
+	conn.Write([]byte(response))
 }
