@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"path"
+	"slices"
+	"strings"
 )
 
 func main() {
@@ -18,6 +22,8 @@ func main() {
 
 	defer listener.Close()
 
+	setupRoutes(connection)
+
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -27,4 +33,66 @@ func main() {
 
 		go connection.handle(conn)
 	}
+}
+
+func setupRoutes(c *Connection) {
+	c.Use("GET", "/", func(request *HTTPRequest) HTTPResponse {
+		return OK
+	})
+	c.Use("GET", "/index.html", func(request *HTTPRequest) HTTPResponse {
+		return OK
+	})
+	c.Use("GET", "/echo", func(request *HTTPRequest) HTTPResponse {
+		resp := strings.TrimPrefix(request.URI, "/echo/")
+		encodings := strings.Split(request.Headers["accept-encoding"], ", ")
+
+		if slices.Contains(encodings, "gzip") {
+			compressed, err := compressString(resp)
+			if err != nil {
+				fmt.Printf("Error with compression: %s\n", err.Error())
+				return BadRequest
+			}
+			return HTTPResponse(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(compressed), string(compressed)))
+		}
+
+		return HTTPResponse(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(resp), string(resp)))
+	})
+	c.Use("GET", "/user-agent", func(request *HTTPRequest) HTTPResponse {
+		userAgent := request.Headers["user-agent"]
+		return HTTPResponse(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(userAgent), userAgent))
+	})
+	c.Use("GET", "/files", func(request *HTTPRequest) HTTPResponse {
+		dir := os.Args[2]
+		filename := strings.TrimPrefix(request.URI, "/files/")
+		filepath := path.Join(dir, filename)
+
+		content, err := os.ReadFile(filepath)
+		if err == nil {
+			return HTTPResponse(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(content), content))
+		} else {
+			return NotFound
+		}
+
+	})
+	c.Use("POST", "/files", func(request *HTTPRequest) HTTPResponse {
+		dir := os.Args[2]
+		filename := strings.TrimPrefix(request.URI, "/files/")
+		filepath := path.Join(dir, filename)
+
+		file, err := os.Create(filepath)
+		defer file.Close()
+		if err != nil {
+			fmt.Printf("Error creating file: %s\n", err.Error())
+			return BadRequest
+		}
+
+		data := []byte(bytes.Trim([]byte(request.Body), "\x00"))
+		_, err = file.Write(data)
+		if err != nil {
+			fmt.Printf("Error creating the file: %s\n", err.Error())
+			return NotFound
+		} else {
+			return Created
+		}
+	})
 }
