@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"compress/gzip"
 	"fmt"
 	"net"
 	"strings"
@@ -87,6 +85,9 @@ func (c *Connection) handle(conn net.Conn) {
 	requestTimeout, err := conn.Read(buf)
 	if err != nil {
 		fmt.Println("Error reading data: ", err.Error())
+		response := NewResponse(conn)
+		response.Status(401).Body([]byte("Bad Request")).Send()
+		return
 	}
 
 	request, err := ParseRequest(buf, requestTimeout, conn)
@@ -94,27 +95,9 @@ func (c *Connection) handle(conn net.Conn) {
 	if err != nil {
 		fmt.Printf("Error with request: %s\n", err.Error())
 		response := NewResponse(conn)
-		response.Status(400).Send()
+		response.Status(400).Body([]byte("Bad Request")).Send()
 		return
 	}
 
 	c.ProcessRoutes(request, conn)
-}
-
-func compressString(s string) ([]byte, error) {
-	var buf bytes.Buffer
-	gzWriter := gzip.NewWriter(&buf)
-	defer gzWriter.Close()
-
-	_, err := gzWriter.Write([]byte(s))
-	if err != nil {
-		return nil, err
-	}
-
-	err = gzWriter.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
 }

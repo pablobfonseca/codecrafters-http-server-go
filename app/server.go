@@ -47,16 +47,7 @@ func setupRoutes(c *Connection) {
 		encodings := strings.Split(request.Headers["accept-encoding"], ", ")
 
 		if slices.Contains(encodings, "gzip") {
-			compressed, err := compressString(resp)
-			if err != nil {
-				fmt.Printf("Error with compression: %s\n", err.Error())
-				response.Status(400).Send()
-				return
-			}
-			response.AddHeader("Content-Encoding", "gzip")
-			response.AddContentTypeHeader("text/plain")
-			response.AddContentLengthHeader(len(compressed))
-			response.Status(200).Body(compressed).Send()
+			response.CompressAndSend(resp)
 			return
 		}
 

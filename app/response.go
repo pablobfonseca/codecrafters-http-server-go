@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"net"
+
+	"github.com/codecrafters-io/http-server-starter-go/app/utils"
 )
 
 type HTTPResponse string
@@ -10,10 +12,11 @@ type Statuses string
 type Headers string
 
 const (
-	OK         Statuses = "OK"
-	NotFound   Statuses = "Not Found"
-	Created    Statuses = "Created"
-	BadRequest Statuses = "Bad Request"
+	OK                  Statuses = "OK"
+	NotFound            Statuses = "Not Found"
+	Created             Statuses = "Created"
+	BadRequest          Statuses = "Bad Request"
+	InternalServerError Statuses = "Internal Server Error"
 )
 
 var STATUS_CODES = map[int]Statuses{
@@ -21,6 +24,7 @@ var STATUS_CODES = map[int]Statuses{
 	404: NotFound,
 	201: Created,
 	400: BadRequest,
+	500: InternalServerError,
 }
 
 const (
@@ -98,4 +102,16 @@ func (r *Response) AddContentTypeHeader(value string) {
 
 func (r *Response) AddContentLengthHeader(length int) {
 	r.Headers["Content-Length"] = fmt.Sprintf("%d", length)
+}
+
+func (r *Response) CompressAndSend(data string) {
+	compressed, err := utils.CompressString(data)
+	if err != nil {
+		r.Status(500).Body([]byte("Compression error")).Send()
+		return
+	}
+	r.AddHeader("Content-Encoding", "gzip")
+	r.AddContentTypeHeader("text/plain")
+	r.AddContentLengthHeader(len(compressed))
+	r.Status(200).Body(compressed).Send()
 }
